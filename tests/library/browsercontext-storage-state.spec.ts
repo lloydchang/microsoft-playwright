@@ -214,3 +214,20 @@ it('should handle malformed file', async ({ contextFactory }, testInfo) => {
   else
     expect(error.message).toContain(`Error reading storage state from ${file}:\nUnexpected token o in JSON at position 1`);
 });
+
+it('should serialize all UTF16 characters', async ({ contextFactory, server }, testInfo) => {
+  it.info().annotations.push({ type: 'issue', description: 'https://github.com/microsoft/playwright-dotnet/issues/2819' });
+  const chars = [];
+  for (let i = 0; i < 2 ** 16; i++)
+    chars.push(String.fromCharCode(i));
+  const context = await contextFactory();
+  const page = await context.newPage();
+  await page.goto(server.EMPTY_PAGE);
+  await page.evaluate(value => {
+    window.localStorage.setItem('foo', value);
+  }, chars.join(''));
+  const storageState = await context.storageState({ path: testInfo.outputPath('state.json') });
+  expect(storageState.origins[0].localStorage[0].value.length).toBe(2 ** 16);
+  expect(storageState.origins[0].localStorage[0].value).toBe(chars.join(''));
+  await context.close();
+});
