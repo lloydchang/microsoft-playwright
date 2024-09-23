@@ -9,7 +9,7 @@ on:
       - .github/workflows/tests_bidi.yml
   schedule:
     # Run every day at midnight
-    - cron: '0 0 * * *'
+#    - cron: '0 0 * * *'
 
 env:
   FORCE_COLOR: 1
