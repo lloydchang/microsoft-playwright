@@ -41,7 +41,7 @@ it('should kill browser process on timeout after close', async ({ browserType, m
   expect(stalled).toBeTruthy();
 });
 
-it('should throw a friendly error if its headed and there is no xserver on linux running', async ({ mode, browserType, platform }) => {
+it('should throw a friendly error if its headed and there is no xserver on linux running', async ({ mode, browserType, platform, channel }) => {
   it.skip(platform !== 'linux');
   it.skip(mode.startsWith('service'));
 

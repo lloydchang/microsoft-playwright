@@ -38,7 +38,7 @@ for li in page.get_by_role('listitem').all():
 ```
 
 ```java
-for (Locator li : page.getByRole('listitem').all())
+for (Locator li : page.getByRole("listitem").all())
   li.click();
 ```
 
@@ -54,7 +54,7 @@ foreach (var li in await page.GetByRole("listitem").AllAsync())
 Returns an array of `node.innerText` values for all matching nodes.
 
 :::warning[Asserting text]
-If you need to assert text on the page, prefer [`method: LocatorAssertions.toHaveText`] with [`option: useInnerText`] option to avoid flakiness. See [assertions guide](../test-assertions.md) for more details.
+If you need to assert text on the page, prefer [`method: LocatorAssertions.toHaveText`] with [`option: LocatorAssertions.toHaveText.useInnerText`] option to avoid flakiness. See [assertions guide](../test-assertions.md) for more details.
 :::
 
 **Usage**
@@ -150,6 +150,64 @@ var button = page.GetByRole(AriaRole.Button).And(page.GetByTitle("Subscribe"));
 
 Additional locator to match.
 
+## async method: Locator.ariaSnapshot
+* since: v1.49
+- returns: <[string]>
+
+Captures the aria snapshot of the given element.
+Read more about [aria snapshots](../aria-snapshots.md) and [`method: LocatorAssertions.toMatchAriaSnapshot`] for the corresponding assertion.
+
+**Usage**
+
+```js
+await page.getByRole('link').ariaSnapshot();
+```
+
+```java
+page.getByRole(AriaRole.LINK).ariaSnapshot();
+```
+
+```python async
+await page.get_by_role("link").aria_snapshot()
+```
+
+```python sync
+page.get_by_role("link").aria_snapshot()
+```
+
+```csharp
+await page.GetByRole(AriaRole.Link).AriaSnapshotAsync();
+```
+
+**Details**
+
+This method captures the aria snapshot of the given element. The snapshot is a string that represents the state of the element and its children.
+The snapshot can be used to assert the state of the element in the test, or to compare it to state in the future.
+
+The ARIA snapshot is represented using [YAML](https://yaml.org/spec/1.2.2/) markup language:
+* The keys of the objects are the roles and optional accessible names of the elements.
+* The values are either text content or an array of child elements.
+* Generic static text can be represented with the `text` key.
+
+Below is the HTML markup and the respective ARIA snapshot:
+
+```html
+<ul aria-label="Links">
+  <li><a href="/">Home</a></li>
+  <li><a href="/about">About</a></li>
+<ul>
+```
+
+```yml
+- list "Links":
+  - listitem:
+    - link "Home"
+  - listitem:
+    - link "About"
+```
+
+### option: Locator.ariaSnapshot.timeout = %%-input-timeout-js-%%
+* since: v1.49
 
 ## async method: Locator.blur
 * since: v1.28
@@ -433,7 +491,7 @@ await page.Locator("canvas").ClickAsync(new() {
 ### option: Locator.click.timeout = %%-input-timeout-js-%%
 * since: v1.14
 
-### option: Locator.click.trial = %%-input-trial-%%
+### option: Locator.click.trial = %%-input-trial-with-modifiers-%%
 * since: v1.14
 
 ## async method: Locator.count
@@ -516,7 +574,7 @@ When all steps combined have not finished during the specified [`option: timeout
 ### option: Locator.dblclick.timeout = %%-input-timeout-js-%%
 * since: v1.14
 
-### option: Locator.dblclick.trial = %%-input-trial-%%
+### option: Locator.dblclick.trial = %%-input-trial-with-modifiers-%%
 * since: v1.14
 
 ## async method: Locator.dispatchEvent
@@ -1266,7 +1324,7 @@ When all steps combined have not finished during the specified [`option: timeout
 ### option: Locator.hover.timeout = %%-input-timeout-js-%%
 * since: v1.14
 
-### option: Locator.hover.trial = %%-input-trial-%%
+### option: Locator.hover.trial = %%-input-trial-with-modifiers-%%
 * since: v1.14
 
 ### option: Locator.hover.noWaitAfter = %%-input-no-wait-after-removed-%%
@@ -1291,7 +1349,7 @@ Returns the [`element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/A
 Returns the [`element.innerText`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/innerText).
 
 :::warning[Asserting text]
-If you need to assert text on the page, prefer [`method: LocatorAssertions.toHaveText`] with [`option: useInnerText`] option to avoid flakiness. See [assertions guide](../test-assertions.md) for more details.
+If you need to assert text on the page, prefer [`method: LocatorAssertions.toHaveText`] with [`option: LocatorAssertions.toHaveText.useInnerText`] option to avoid flakiness. See [assertions guide](../test-assertions.md) for more details.
 :::
 
 ### option: Locator.innerText.timeout = %%-input-timeout-%%
@@ -2331,7 +2389,7 @@ When all steps combined have not finished during the specified [`option: timeout
 ### option: Locator.tap.timeout = %%-input-timeout-js-%%
 * since: v1.14
 
-### option: Locator.tap.trial = %%-input-trial-%%
+### option: Locator.tap.trial = %%-input-trial-with-modifiers-%%
 * since: v1.14
 
 ## async method: Locator.textContent

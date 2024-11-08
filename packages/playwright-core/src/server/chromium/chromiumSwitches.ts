@@ -35,8 +35,10 @@ export const chromiumSwitches = [
   // Translate - https://github.com/microsoft/playwright/issues/16126
   // HttpsUpgrades - https://github.com/microsoft/playwright/pull/27605
   // PaintHolding - https://github.com/microsoft/playwright/issues/28023
+  // ThirdPartyStoragePartitioning - https://github.com/microsoft/playwright/issues/32230
+  // LensOverlay - Hides the Lens feature in the URL address bar. Its not working in unofficial builds.
   // PlzDedicatedWorker - https://github.com/microsoft/playwright/issues/31747
-  '--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,PlzDedicatedWorker',
+  '--disable-features=ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,DialMediaRouteProvider,AcceptCHFrame,AutoExpandDetailsElement,CertificateTransparencyComponentUpdater,AvoidUnnecessaryBeforeUnloadCheckSync,Translate,HttpsUpgrades,PaintHolding,ThirdPartyStoragePartitioning,LensOverlay,PlzDedicatedWorker',
   '--allow-pre-commit-input',
   '--disable-hang-monitor',
   '--disable-ipc-flooding-protection',

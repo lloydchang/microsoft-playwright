@@ -192,6 +192,7 @@ export abstract class BrowserType extends SdkObject {
       userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), `playwright_${this._name}dev_profile-`));
       tempDirectories.push(userDataDir);
     }
+    await this.prepareUserDataDir(options, userDataDir);
 
     const browserArguments = [];
     if (ignoreAllDefaultArgs)
@@ -207,7 +208,7 @@ export abstract class BrowserType extends SdkObject {
         throw new Error(`Failed to launch ${this._name} because executable doesn't exist at ${executablePath}`);
       executable = executablePath;
     } else {
-      const registryExecutable = registry.findExecutable(options.channel || this._name);
+      const registryExecutable = registry.findExecutable(this.getExecutableName(options));
       if (!registryExecutable || registryExecutable.browserName !== this._name)
         throw new Error(`Unsupported ${this._name} channel "${options.channel}"`);
       executable = registryExecutable.executablePathOrDie(this.attribution.playwright.options.sdkLanguage);
@@ -326,6 +327,13 @@ export abstract class BrowserType extends SdkObject {
 
   readyState(options: types.LaunchOptions): BrowserReadyState|undefined {
     return undefined;
+  }
+
+  async prepareUserDataDir(options: types.LaunchOptions, userDataDir: string): Promise<void> {
+  }
+
+  getExecutableName(options: types.LaunchOptions): string {
+    return options.channel || this._name;
   }
 
   abstract defaultArgs(options: types.LaunchOptions, isPersistent: boolean, userDataDir: string): string[];

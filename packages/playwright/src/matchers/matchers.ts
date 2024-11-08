@@ -15,7 +15,7 @@
  */
 
 import type { Locator, Page, APIResponse } from 'playwright-core';
-import type { FrameExpectOptions } from 'playwright-core/lib/client/types';
+import type { FrameExpectParams } from 'playwright-core/lib/client/types';
 import { colors } from 'playwright-core/lib/utilsBundle';
 import { expectTypes, callLogText } from '../util';
 import { toBeTruthy } from './toBeTruthy';
@@ -27,8 +27,8 @@ import { TestInfoImpl } from '../worker/testInfo';
 import type { ExpectMatcherState } from '../../types/test';
 import { takeFirst } from '../common/config';
 
-interface LocatorEx extends Locator {
-  _expect(expression: string, options: Omit<FrameExpectOptions, 'expectedValue'> & { expectedValue?: any }): Promise<{ matches: boolean, received?: any, log?: string[], timedOut?: boolean }>;
+export interface LocatorEx extends Locator {
+  _expect(expression: string, options: FrameExpectParams): Promise<{ matches: boolean, received?: any, log?: string[], timedOut?: boolean }>;
 }
 
 interface APIResponseEx extends APIResponse {

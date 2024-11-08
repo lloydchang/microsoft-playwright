@@ -35,6 +35,7 @@ export type BrowserTestWorkerFixtures = PageWorkerFixtures & {
   browserType: BrowserType;
   isAndroid: boolean;
   isElectron: boolean;
+  nodeVersion: { major: number, minor: number, patch: number };
   bidiTestSkipPredicate: (info: TestInfo) => boolean;
 };
 
@@ -69,13 +70,13 @@ const test = baseTest.extend<BrowserTestTestFixtures, BrowserTestWorkerFixtures>
       await run(false);
   }, { scope: 'worker' }],
 
-  defaultSameSiteCookieValue: [async ({ browserName, isLinux }, run) => {
+  defaultSameSiteCookieValue: [async ({ browserName, platform, macVersion }, run) => {
     if (browserName === 'chromium' || browserName as any === '_bidiChromium')
       await run('Lax');
-    else if (browserName === 'webkit' && isLinux)
+    else if (browserName === 'webkit' && platform === 'linux')
       await run('Lax');
-    else if (browserName === 'webkit' && !isLinux)
-      await run('None');
+    else if (browserName === 'webkit')
+      await run('None'); // Windows + older macOS
     else if (browserName === 'firefox' || browserName as any === '_bidiFirefox')
       await run('None');
     else
@@ -84,6 +85,11 @@ const test = baseTest.extend<BrowserTestTestFixtures, BrowserTestWorkerFixtures>
 
   browserMajorVersion: [async ({ browserVersion }, run) => {
     await run(Number(browserVersion.split('.')[0]));
+  }, { scope: 'worker' }],
+
+  nodeVersion: [async ({}, use) => {
+    const [major, minor, patch] = process.versions.node.split('.');
+    await use({ major: +major, minor: +minor, patch: +patch });
   }, { scope: 'worker' }],
 
   isAndroid: [false, { scope: 'worker' }],

@@ -232,7 +232,8 @@ it('should click a button when it overlays oopif', async function({ page, browse
   expect(await page.evaluate(() => (window as any)['BUTTON_CLICKED'])).toBe(true);
 });
 
-it('should report google.com frame with headed', async ({ browserType, server }) => {
+it('should report google.com frame with headed', async ({ browserType, server, channel }) => {
+  it.skip(channel === 'chromium-headless-shell', 'Headless Shell does not support headed mode');
   // @see https://github.com/GoogleChrome/puppeteer/issues/2548
   // https://google.com is isolated by default in Chromium embedder.
   const browser = await browserType.launch({ headless: false });
@@ -269,7 +270,7 @@ it('ElementHandle.boundingBox() should work', async function({ page, browser, se
 
   await assertOOPIFCount(browser, 1);
   const handle1 = await page.frames()[1].$('.box:nth-of-type(13)');
-  expect(await handle1!.boundingBox()).toEqual({ x: 100 + 42, y: 50 + 17, width: 50, height: 50 });
+  await expect.poll(() => handle1!.boundingBox()).toEqual({ x: 100 + 42, y: 50 + 17, width: 50, height: 50 });
 
   await Promise.all([
     page.frames()[1].waitForNavigation(),
@@ -277,7 +278,7 @@ it('ElementHandle.boundingBox() should work', async function({ page, browser, se
   ]);
   await assertOOPIFCount(browser, 0);
   const handle2 = await page.frames()[1].$('.box:nth-of-type(13)');
-  expect(await handle2!.boundingBox()).toEqual({ x: 100 + 42, y: 50 + 17, width: 50, height: 50 });
+  await expect.poll(() => handle2!.boundingBox()).toEqual({ x: 100 + 42, y: 50 + 17, width: 50, height: 50 });
 });
 
 it('should click', async function({ page, browser, server }) {

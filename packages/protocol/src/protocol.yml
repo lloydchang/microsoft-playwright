@@ -1160,6 +1160,17 @@ BrowserContext:
               regexSource: string?
               regexFlags: string?
 
+    setWebSocketInterceptionPatterns:
+      parameters:
+        patterns:
+          type: array
+          items:
+            type: object
+            properties:
+              glob: string?
+              regexSource: string?
+              regexFlags: string?
+
     setOffline:
       parameters:
         offline: boolean
@@ -1176,7 +1187,7 @@ BrowserContext:
     pause:
       experimental: True
 
-    recorderSupplementEnable:
+    enableRecorder:
       experimental: True
       parameters:
         language: string?
@@ -1185,6 +1196,11 @@ BrowserContext:
           literals:
           - inspecting
           - recording
+        codegenMode:
+          type: enum?
+          literals:
+          - actions
+          - trace-events
         pauseOnNextStatement: boolean?
         testIdAttributeName: string?
         launchOptions: json?
@@ -1192,6 +1208,7 @@ BrowserContext:
         device: string?
         saveStorage: string?
         outputFile: string?
+        handleSIGINT: boolean?
         omitCallTracking: boolean?
 
     newCDPSession:
@@ -1304,6 +1321,10 @@ BrowserContext:
     route:
       parameters:
         route: Route
+
+    webSocketRoute:
+      parameters:
+        webSocketRoute: WebSocketRoute
 
     video:
       parameters:
@@ -1430,7 +1451,7 @@ Page:
         slowMo: true
         snapshot: true
 
-    forceGarbageCollection:
+    requestGC:
 
     registerLocatorHandler:
       parameters:
@@ -1461,7 +1482,7 @@ Page:
     expectScreenshot:
       parameters:
         expected: binary?
-        timeout: number?
+        timeout: number
         isNot: boolean
         locator:
           type: object?
@@ -1480,6 +1501,7 @@ Page:
         errorMessage: string?
         actual: binary?
         previous: binary?
+        timedOut: boolean?
         log:
           type: array?
           items: string
@@ -1510,6 +1532,17 @@ Page:
           items: NameValue
 
     setNetworkInterceptionPatterns:
+      parameters:
+        patterns:
+          type: array
+          items:
+            type: object
+            properties:
+              glob: string?
+              regexSource: string?
+              regexFlags: string?
+
+    setWebSocketInterceptionPatterns:
       parameters:
         patterns:
           type: array
@@ -1771,6 +1804,10 @@ Page:
       parameters:
         route: Route
 
+    webSocketRoute:
+      parameters:
+        webSocketRoute: WebSocketRoute
+
     video:
       parameters:
         artifact: Artifact
@@ -1839,6 +1876,13 @@ Frame:
         element: ElementHandle
       flags:
         snapshot: true
+
+    ariaSnapshot:
+      parameters:
+        selector: string
+        timeout: number?
+      returns:
+        snapshot: string
 
     blur:
       parameters:
@@ -2344,7 +2388,7 @@ Frame:
         expectedValue: SerializedArgument?
         useInnerText: boolean?
         isNot: boolean
-        timeout: number?
+        timeout: number
       returns:
         matches: boolean
         received: SerializedValue?
@@ -2452,10 +2496,6 @@ JSHandle:
     jsonValue:
       returns:
         value: SerializedValue
-
-    objectCount:
-      returns:
-        count: number
 
   events:
 
@@ -2911,7 +2951,6 @@ Route:
     abort:
       parameters:
         errorCode: string?
-        requestUrl: string
 
     continue:
       parameters:
@@ -2921,7 +2960,6 @@ Route:
           type: array?
           items: NameValue
         postData: binary?
-        requestUrl: string
         isFallback: boolean
 
     fulfill:
@@ -2934,7 +2972,66 @@ Route:
         body: string?
         isBase64: boolean?
         fetchResponseUid: string?
-        requestUrl: string
+
+
+WebSocketRoute:
+  type: interface
+
+  initializer:
+    url: string
+
+  commands:
+
+    connect:
+
+    ensureOpened:
+
+    sendToPage:
+      parameters:
+        message: string
+        isBase64: boolean
+
+    sendToServer:
+      parameters:
+        message: string
+        isBase64: boolean
+
+    closePage:
+      parameters:
+        code: number?
+        reason: string?
+        wasClean: boolean
+
+    closeServer:
+      parameters:
+        code: number?
+        reason: string?
+        wasClean: boolean
+
+  events:
+
+    messageFromPage:
+      parameters:
+        message: string
+        isBase64: boolean
+
+    messageFromServer:
+      parameters:
+        message: string
+        isBase64: boolean
+
+    closePage:
+      parameters:
+        code: number?
+        reason: string?
+        wasClean: boolean
+
+    closeServer:
+      parameters:
+        code: number?
+        reason: string?
+        wasClean: boolean
+
 
 ResourceTiming:
   type: object
@@ -3100,6 +3197,18 @@ Tracing:
         title: string?
       returns:
         traceName: string
+
+    tracingGroup:
+      parameters:
+        name: string
+        location:
+          type: object?
+          properties:
+            file: string
+            line: number?
+            column: number?
+
+    tracingGroupEnd:
 
     tracingStopChunk:
       parameters:

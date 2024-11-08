@@ -14,11 +14,13 @@
   limitations under the License.
 */
 
-import type { CallLog, Mode, Source } from './recorderTypes';
+import type { CallLog, ElementInfo, Mode, Source } from './recorderTypes';
 import { CodeMirrorWrapper } from '@web/components/codeMirrorWrapper';
+import type { SourceHighlight } from '@web/components/codeMirrorWrapper';
 import { SplitView } from '@web/components/splitView';
 import { TabbedPane } from '@web/components/tabbedPane';
 import { Toolbar } from '@web/components/toolbar';
+import { emptySource, SourceChooser } from '@web/components/sourceChooser';
 import { ToolbarButton, ToolbarSeparator } from '@web/components/toolbarButton';
 import * as React from 'react';
 import { CallLogView } from './callLog';
@@ -26,6 +28,10 @@ import './recorder.css';
 import { asLocator } from '@isomorphic/locatorGenerators';
 import { toggleTheme } from '@web/theme';
 import { copy } from '@web/uiUtils';
+import yaml from 'yaml';
+import type { YAMLError } from 'yaml';
+import { parseAriaKey } from '@isomorphic/ariaSnapshot';
+import type { AriaKeyError, ParsedYaml } from '@isomorphic/ariaSnapshot';
 
 export interface RecorderProps {
   sources: Source[],
@@ -40,13 +46,13 @@ export const Recorder: React.FC<RecorderProps> = ({
   log,
   mode,
 }) => {
-  const [fileId, setFileId] = React.useState<string | undefined>();
+  const [selectedFileId, setSelectedFileId] = React.useState<string | undefined>();
+  const [runningFileId, setRunningFileId] = React.useState<string | undefined>();
   const [selectedTab, setSelectedTab] = React.useState<string>('log');
+  const [ariaSnapshot, setAriaSnapshot] = React.useState<string | undefined>();
+  const [ariaSnapshotErrors, setAriaSnapshotErrors] = React.useState<SourceHighlight[]>();
 
-  React.useEffect(() => {
-    if (!fileId && sources.length > 0)
-      setFileId(sources[0].id);
-  }, [fileId, sources]);
+  const fileId = selectedFileId || runningFileId || sources[0]?.id;
 
   const source = React.useMemo(() => {
     if (fileId) {
@@ -54,26 +60,25 @@ export const Recorder: React.FC<RecorderProps> = ({
       if (source)
         return source;
     }
-    const source: Source = {
-      id: 'default',
-      isRecorded: false,
-      text: '',
-      language: 'javascript',
-      label: '',
-      highlight: []
-    };
-    return source;
+    return emptySource();
   }, [sources, fileId]);
 
   const [locator, setLocator] = React.useState('');
-  window.playwrightSetSelector = (selector: string, focus?: boolean) => {
+  window.playwrightElementPicked = (elementInfo: ElementInfo, userGesture?: boolean) => {
     const language = source.language;
-    if (focus)
+    setLocator(asLocator(language, elementInfo.selector));
+    setAriaSnapshot(elementInfo.ariaSnapshot);
+    if (userGesture && selectedTab !== 'locator' && selectedTab !== 'aria')
       setSelectedTab('locator');
-    setLocator(asLocator(language, selector));
+
+    if (mode === 'inspecting' && selectedTab === 'aria') {
+      // Keep exploring aria.
+    } else {
+      window.dispatch({ event: 'setMode', params: { mode: mode === 'inspecting' ? 'standby' : 'recording' } }).catch(() => { });
+    }
   };
 
-  window.playwrightSetFile = setFileId;
+  window.playwrightSetRunningFile = setRunningFileId;
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   React.useLayoutEffect(() => {
@@ -103,10 +108,20 @@ export const Recorder: React.FC<RecorderProps> = ({
   }, [paused]);
 
   const onEditorChange = React.useCallback((selector: string) => {
-    if (mode === 'none')
+    if (mode === 'none' || mode === 'inspecting')
       window.dispatch({ event: 'setMode', params: { mode: 'standby' } });
     setLocator(selector);
-    window.dispatch({ event: 'selectorUpdated', params: { selector } });
+    window.dispatch({ event: 'highlightRequested', params: { selector } });
+  }, [mode]);
+
+  const onAriaEditorChange = React.useCallback((ariaSnapshot: string) => {
+    if (mode === 'none' || mode === 'inspecting')
+      window.dispatch({ event: 'setMode', params: { mode: 'standby' } });
+    const { fragment, errors } = parseAriaSnapshot(ariaSnapshot);
+    setAriaSnapshotErrors(errors);
+    setAriaSnapshot(ariaSnapshot);
+    if (!errors.length)
+      window.dispatch({ event: 'highlightRequested', params: { ariaSnapshot: fragment } });
   }, [mode]);
 
   return <div className='recorder'>
@@ -125,6 +140,7 @@ export const Recorder: React.FC<RecorderProps> = ({
           'assertingText': 'recording-inspecting',
           'assertingVisibility': 'recording-inspecting',
           'assertingValue': 'recording-inspecting',
+          'assertingSnapshot': 'recording-inspecting',
         }[mode];
         window.dispatch({ event: 'setMode', params: { mode: newMode } }).catch(() => { });
       }}></ToolbarButton>
@@ -137,25 +153,28 @@ export const Recorder: React.FC<RecorderProps> = ({
       <ToolbarButton icon='symbol-constant' title='Assert value' toggled={mode === 'assertingValue'} disabled={mode === 'none' || mode === 'standby' || mode === 'inspecting'} onClick={() => {
         window.dispatch({ event: 'setMode', params: { mode: mode === 'assertingValue' ? 'recording' : 'assertingValue' } });
       }}></ToolbarButton>
+      <ToolbarButton icon='gist' title='Assert snapshot' toggled={mode === 'assertingSnapshot'} disabled={mode === 'none' || mode === 'standby' || mode === 'inspecting'} onClick={() => {
+        window.dispatch({ event: 'setMode', params: { mode: mode === 'assertingSnapshot' ? 'recording' : 'assertingSnapshot' } });
+      }}></ToolbarButton>
       <ToolbarSeparator />
       <ToolbarButton icon='files' title='Copy' disabled={!source || !source.text} onClick={() => {
         copy(source.text);
       }}></ToolbarButton>
-      <ToolbarButton icon='debug-continue' title='Resume (F8)' disabled={!paused} onClick={() => {
+      <ToolbarButton icon='debug-continue' title='Resume (F8)' ariaLabel='Resume' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'resume' });
       }}></ToolbarButton>
-      <ToolbarButton icon='debug-pause' title='Pause (F8)' disabled={paused} onClick={() => {
+      <ToolbarButton icon='debug-pause' title='Pause (F8)' ariaLabel='Pause' disabled={paused} onClick={() => {
         window.dispatch({ event: 'pause' });
       }}></ToolbarButton>
-      <ToolbarButton icon='debug-step-over' title='Step over (F10)' disabled={!paused} onClick={() => {
+      <ToolbarButton icon='debug-step-over' title='Step over (F10)' ariaLabel='Step over' disabled={!paused} onClick={() => {
         window.dispatch({ event: 'step' });
       }}></ToolbarButton>
       <div style={{ flex: 'auto' }}></div>
       <div>Target:</div>
-      <select className='recorder-chooser' hidden={!sources.length} value={fileId} onChange={event => {
-        setFileId(event.target.selectedOptions[0].value);
-        window.dispatch({ event: 'fileChanged', params: { file: event.target.selectedOptions[0].value } });
-      }}>{renderSourceOptions(sources)}</select>
+      <SourceChooser fileId={fileId} sources={sources} setFileId={fileId => {
+        setSelectedFileId(fileId);
+        window.dispatch({ event: 'fileChanged', params: { file: fileId } });
+      }} />
       <ToolbarButton icon='clear-all' title='Clear' disabled={!source || !source.text} onClick={() => {
         window.dispatch({ event: 'clear' });
       }}></ToolbarButton>
@@ -165,7 +184,7 @@ export const Recorder: React.FC<RecorderProps> = ({
       sidebarSize={200}
       main={<CodeMirrorWrapper text={source.text} language={source.language} highlight={source.highlight} revealLine={source.revealLine} readOnly={true} lineNumbers={true} />}
       sidebar={<TabbedPane
-        rightToolbar={selectedTab === 'locator' ? [<ToolbarButton key={1} icon='files' title='Copy' onClick={() => copy(locator)} />] : []}
+        rightToolbar={selectedTab === 'locator' || selectedTab === 'aria' ? [<ToolbarButton key={1} icon='files' title='Copy' onClick={() => copy((selectedTab === 'locator' ? locator : ariaSnapshot) || '')} />] : []}
         tabs={[
           {
             id: 'locator',
@@ -177,6 +196,11 @@ export const Recorder: React.FC<RecorderProps> = ({
             title: 'Log',
             render: () => <CallLogView language={source.language} log={Array.from(log.values())} />
           },
+          {
+            id: 'aria',
+            title: 'Aria snapshot',
+            render: () => <CodeMirrorWrapper text={ariaSnapshot || ''} language={'yaml'} readOnly={false} onChange={onAriaEditorChange} highlight={ariaSnapshotErrors} wrapLines={true} />
+          },
         ]}
         selectedTab={selectedTab}
         setSelectedTab={setSelectedTab}
@@ -185,21 +209,55 @@ export const Recorder: React.FC<RecorderProps> = ({
   </div>;
 };
 
-function renderSourceOptions(sources: Source[]): React.ReactNode {
-  const transformTitle = (title: string): string => title.replace(/.*[/\\]([^/\\]+)/, '$1');
-  const renderOption = (source: Source): React.ReactNode => (
-    <option key={source.id} value={source.id}>{transformTitle(source.label)}</option>
-  );
-
-  const hasGroup = sources.some(s => s.group);
-  if (hasGroup) {
-    const groups = new Set(sources.map(s => s.group));
-    return [...groups].filter(Boolean).map(group => (
-      <optgroup label={group} key={group}>
-        {sources.filter(s => s.group === group).map(source => renderOption(source))}
-      </optgroup>
-    ));
+function parseAriaSnapshot(ariaSnapshot: string): { fragment?: ParsedYaml, errors: SourceHighlight[] } {
+  const lineCounter = new yaml.LineCounter();
+  let yamlDoc: yaml.Document;
+  try {
+    yamlDoc = yaml.parseDocument(ariaSnapshot, {
+      keepSourceTokens: true,
+      lineCounter,
+    });
+  } catch (e) {
+    const error = e as YAMLError;
+    const pos = error.linePos?.[0];
+    return {
+      errors: [{
+        line: pos?.line || 0,
+        type: 'error',
+        message: error.message,
+      }],
+    };
   }
 
-  return sources.map(source => renderOption(source));
+  const errors: SourceHighlight[] = [];
+  const handleKey = (key: yaml.Scalar<string>) => {
+    try {
+      parseAriaKey(key.value);
+    } catch (e) {
+      const keyError = e as AriaKeyError;
+      errors.push({
+        message: keyError.message,
+        line: lineCounter.linePos(key.srcToken!.offset + keyError.pos).line,
+        type: 'error',
+      });
+    }
+  };
+  const visitSeq = (seq: yaml.YAMLSeq) => {
+    for (const item of seq.items) {
+      if (item instanceof yaml.YAMLMap) {
+        const map = item as yaml.YAMLMap;
+        for (const entry of map.items) {
+          if (entry.key instanceof yaml.Scalar)
+            handleKey(entry.key);
+          if (entry.value instanceof yaml.YAMLSeq)
+            visitSeq(entry.value);
+        }
+        continue;
+      }
+      if (item instanceof yaml.Scalar)
+        handleKey(item);
+    }
+  };
+  visitSeq(yamlDoc.contents as yaml.YAMLSeq);
+  return errors.length ? { errors } : { fragment: yamlDoc.toJSON(), errors };
 }

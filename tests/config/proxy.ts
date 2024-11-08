@@ -21,6 +21,11 @@ import net from 'net';
 import type { SocksSocketClosedPayload, SocksSocketDataPayload, SocksSocketRequestedPayload } from '../../packages/playwright-core/src/common/socksProxy';
 import { SocksProxy } from '../../packages/playwright-core/lib/common/socksProxy';
 
+// Certain browsers perform telemetry requests which we want to ignore.
+const kConnectHostsToIgnore = new Set([
+  'www.bing.com:443',
+]);
+
 export class TestProxy {
   readonly PORT: number;
   readonly URL: string;
@@ -57,14 +62,16 @@ export class TestProxy {
     this._prependHandler('request', (req: IncomingMessage) => {
       this.requestUrls.push(req.url);
       const url = new URL(req.url);
-      url.host = `localhost:${port}`;
+      url.host = `127.0.0.1:${port}`;
       req.url = url.toString();
     });
     this._prependHandler('connect', (req: IncomingMessage) => {
       if (!options?.allowConnectRequests)
         return;
+      if (kConnectHostsToIgnore.has(req.url))
+        return;
       this.connectHosts.push(req.url);
-      req.url = `localhost:${port}`;
+      req.url = `127.0.0.1:${port}`;
     });
   }
 
@@ -114,7 +121,7 @@ export async function setupSocksForwardingServer({
   const socksProxy = new SocksProxy();
   socksProxy.setPattern('*');
   socksProxy.addListener(SocksProxy.Events.SocksRequested, async (payload: SocksSocketRequestedPayload) => {
-    if (!['127.0.0.1', 'fake-localhost-127-0-0-1.nip.io', 'localhost'].includes(payload.host) || payload.port !== allowedTargetPort) {
+    if (!['127.0.0.1', '0:0:0:0:0:0:0:1', 'fake-localhost-127-0-0-1.nip.io', 'localhost'].includes(payload.host) || payload.port !== allowedTargetPort) {
       socksProxy.sendSocketError({ uid: payload.uid, error: 'ECONNREFUSED' });
       return;
     }
@@ -138,10 +145,10 @@ export async function setupSocksForwardingServer({
     connections.get(payload.uid)?.destroy();
     connections.delete(payload.uid);
   });
-  await socksProxy.listen(port, 'localhost');
+  await socksProxy.listen(port, '127.0.0.1');
   return {
     closeProxyServer: () => socksProxy.close(),
-    proxyServerAddr: `socks5://localhost:${port}`,
+    proxyServerAddr: `socks5://127.0.0.1:${port}`,
     connectHosts,
   };
 }

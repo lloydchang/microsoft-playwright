@@ -14,22 +14,26 @@
  * limitations under the License.
  */
 
-import type { CallLog, Mode, Source } from '@recorder/recorderTypes';
+import type * as actions from '@recorder/actions';
+import type { CallLog, Mode, Source, ElementInfo } from '@recorder/recorderTypes';
 import type { EventEmitter } from 'events';
 
 export interface IRecorder {
   setMode(mode: Mode): void;
   mode(): Mode;
+  readonly handleSIGINT: boolean | undefined;
 }
 
 export interface IRecorderApp extends EventEmitter {
+  readonly wsEndpointForTest: string | undefined;
   close(): Promise<void>;
   setPaused(paused: boolean): Promise<void>;
   setMode(mode: Mode): Promise<void>;
-  setFile(file: string): Promise<void>;
-  setSelector(selector: string, userGesture?: boolean): Promise<void>;
+  setRunningFile(file: string | undefined): Promise<void>;
+  elementPicked(elementInfo: ElementInfo, userGesture?: boolean): Promise<void>;
   updateCallLogs(callLogs: CallLog[]): Promise<void>;
   setSources(sources: Source[]): Promise<void>;
+  setActions(actions: actions.ActionInContext[], sources: Source[]): Promise<void>;
 }
 
 export type IRecorderAppFactory = (recorder: IRecorder) => Promise<IRecorderApp>;

@@ -832,6 +832,9 @@ scheme.BrowserContextPageErrorEvent = tObject({
 scheme.BrowserContextRouteEvent = tObject({
   route: tChannel(['Route']),
 });
+scheme.BrowserContextWebSocketRouteEvent = tObject({
+  webSocketRoute: tChannel(['WebSocketRoute']),
+});
 scheme.BrowserContextVideoEvent = tObject({
   artifact: tChannel(['Artifact']),
 });
@@ -943,6 +946,14 @@ scheme.BrowserContextSetNetworkInterceptionPatternsParams = tObject({
   })),
 });
 scheme.BrowserContextSetNetworkInterceptionPatternsResult = tOptional(tObject({}));
+scheme.BrowserContextSetWebSocketInterceptionPatternsParams = tObject({
+  patterns: tArray(tObject({
+    glob: tOptional(tString),
+    regexSource: tOptional(tString),
+    regexFlags: tOptional(tString),
+  })),
+});
+scheme.BrowserContextSetWebSocketInterceptionPatternsResult = tOptional(tObject({}));
 scheme.BrowserContextSetOfflineParams = tObject({
   offline: tBoolean,
 });
@@ -954,9 +965,10 @@ scheme.BrowserContextStorageStateResult = tObject({
 });
 scheme.BrowserContextPauseParams = tOptional(tObject({}));
 scheme.BrowserContextPauseResult = tOptional(tObject({}));
-scheme.BrowserContextRecorderSupplementEnableParams = tObject({
+scheme.BrowserContextEnableRecorderParams = tObject({
   language: tOptional(tString),
   mode: tOptional(tEnum(['inspecting', 'recording'])),
+  codegenMode: tOptional(tEnum(['actions', 'trace-events'])),
   pauseOnNextStatement: tOptional(tBoolean),
   testIdAttributeName: tOptional(tString),
   launchOptions: tOptional(tAny),
@@ -964,9 +976,10 @@ scheme.BrowserContextRecorderSupplementEnableParams = tObject({
   device: tOptional(tString),
   saveStorage: tOptional(tString),
   outputFile: tOptional(tString),
+  handleSIGINT: tOptional(tBoolean),
   omitCallTracking: tOptional(tBoolean),
 });
-scheme.BrowserContextRecorderSupplementEnableResult = tOptional(tObject({}));
+scheme.BrowserContextEnableRecorderResult = tOptional(tObject({}));
 scheme.BrowserContextNewCDPSessionParams = tObject({
   page: tOptional(tChannel(['Page'])),
   frame: tOptional(tChannel(['Frame'])),
@@ -1070,6 +1083,9 @@ scheme.PageLocatorHandlerTriggeredEvent = tObject({
 scheme.PageRouteEvent = tObject({
   route: tChannel(['Route']),
 });
+scheme.PageWebSocketRouteEvent = tObject({
+  webSocketRoute: tChannel(['WebSocketRoute']),
+});
 scheme.PageVideoEvent = tObject({
   artifact: tChannel(['Artifact']),
 });
@@ -1122,8 +1138,8 @@ scheme.PageGoForwardParams = tObject({
 scheme.PageGoForwardResult = tObject({
   response: tOptional(tChannel(['Response'])),
 });
-scheme.PageForceGarbageCollectionParams = tOptional(tObject({}));
-scheme.PageForceGarbageCollectionResult = tOptional(tObject({}));
+scheme.PageRequestGCParams = tOptional(tObject({}));
+scheme.PageRequestGCResult = tOptional(tObject({}));
 scheme.PageRegisterLocatorHandlerParams = tObject({
   selector: tString,
   noWaitAfter: tOptional(tBoolean),
@@ -1149,7 +1165,7 @@ scheme.PageReloadResult = tObject({
 });
 scheme.PageExpectScreenshotParams = tObject({
   expected: tOptional(tBinary),
-  timeout: tOptional(tNumber),
+  timeout: tNumber,
   isNot: tBoolean,
   locator: tOptional(tObject({
     frame: tChannel(['Frame']),
@@ -1177,6 +1193,7 @@ scheme.PageExpectScreenshotResult = tObject({
   errorMessage: tOptional(tString),
   actual: tOptional(tBinary),
   previous: tOptional(tBinary),
+  timedOut: tOptional(tBoolean),
   log: tOptional(tArray(tString)),
 });
 scheme.PageScreenshotParams = tObject({
@@ -1211,6 +1228,14 @@ scheme.PageSetNetworkInterceptionPatternsParams = tObject({
   })),
 });
 scheme.PageSetNetworkInterceptionPatternsResult = tOptional(tObject({}));
+scheme.PageSetWebSocketInterceptionPatternsParams = tObject({
+  patterns: tArray(tObject({
+    glob: tOptional(tString),
+    regexSource: tOptional(tString),
+    regexFlags: tOptional(tString),
+  })),
+});
+scheme.PageSetWebSocketInterceptionPatternsResult = tOptional(tObject({}));
 scheme.PageSetViewportSizeParams = tObject({
   viewportSize: tObject({
     width: tNumber,
@@ -1400,6 +1425,13 @@ scheme.FrameAddStyleTagParams = tObject({
 });
 scheme.FrameAddStyleTagResult = tObject({
   element: tChannel(['ElementHandle']),
+});
+scheme.FrameAriaSnapshotParams = tObject({
+  selector: tString,
+  timeout: tOptional(tNumber),
+});
+scheme.FrameAriaSnapshotResult = tObject({
+  snapshot: tString,
 });
 scheme.FrameBlurParams = tObject({
   selector: tString,
@@ -1738,7 +1770,7 @@ scheme.FrameExpectParams = tObject({
   expectedValue: tOptional(tType('SerializedArgument')),
   useInnerText: tOptional(tBoolean),
   isNot: tBoolean,
-  timeout: tOptional(tNumber),
+  timeout: tNumber,
 });
 scheme.FrameExpectResult = tObject({
   matches: tBoolean,
@@ -1820,12 +1852,6 @@ scheme.JSHandleJsonValueResult = tObject({
   value: tType('SerializedValue'),
 });
 scheme.ElementHandleJsonValueResult = tType('JSHandleJsonValueResult');
-scheme.JSHandleObjectCountParams = tOptional(tObject({}));
-scheme.ElementHandleObjectCountParams = tType('JSHandleObjectCountParams');
-scheme.JSHandleObjectCountResult = tObject({
-  count: tNumber,
-});
-scheme.ElementHandleObjectCountResult = tType('JSHandleObjectCountResult');
 scheme.ElementHandleInitializer = tObject({
   preview: tString,
 });
@@ -2093,7 +2119,6 @@ scheme.RouteRedirectNavigationRequestParams = tObject({
 scheme.RouteRedirectNavigationRequestResult = tOptional(tObject({}));
 scheme.RouteAbortParams = tObject({
   errorCode: tOptional(tString),
-  requestUrl: tString,
 });
 scheme.RouteAbortResult = tOptional(tObject({}));
 scheme.RouteContinueParams = tObject({
@@ -2101,7 +2126,6 @@ scheme.RouteContinueParams = tObject({
   method: tOptional(tString),
   headers: tOptional(tArray(tType('NameValue'))),
   postData: tOptional(tBinary),
-  requestUrl: tString,
   isFallback: tBoolean,
 });
 scheme.RouteContinueResult = tOptional(tObject({}));
@@ -2111,9 +2135,55 @@ scheme.RouteFulfillParams = tObject({
   body: tOptional(tString),
   isBase64: tOptional(tBoolean),
   fetchResponseUid: tOptional(tString),
-  requestUrl: tString,
 });
 scheme.RouteFulfillResult = tOptional(tObject({}));
+scheme.WebSocketRouteInitializer = tObject({
+  url: tString,
+});
+scheme.WebSocketRouteMessageFromPageEvent = tObject({
+  message: tString,
+  isBase64: tBoolean,
+});
+scheme.WebSocketRouteMessageFromServerEvent = tObject({
+  message: tString,
+  isBase64: tBoolean,
+});
+scheme.WebSocketRouteClosePageEvent = tObject({
+  code: tOptional(tNumber),
+  reason: tOptional(tString),
+  wasClean: tBoolean,
+});
+scheme.WebSocketRouteCloseServerEvent = tObject({
+  code: tOptional(tNumber),
+  reason: tOptional(tString),
+  wasClean: tBoolean,
+});
+scheme.WebSocketRouteConnectParams = tOptional(tObject({}));
+scheme.WebSocketRouteConnectResult = tOptional(tObject({}));
+scheme.WebSocketRouteEnsureOpenedParams = tOptional(tObject({}));
+scheme.WebSocketRouteEnsureOpenedResult = tOptional(tObject({}));
+scheme.WebSocketRouteSendToPageParams = tObject({
+  message: tString,
+  isBase64: tBoolean,
+});
+scheme.WebSocketRouteSendToPageResult = tOptional(tObject({}));
+scheme.WebSocketRouteSendToServerParams = tObject({
+  message: tString,
+  isBase64: tBoolean,
+});
+scheme.WebSocketRouteSendToServerResult = tOptional(tObject({}));
+scheme.WebSocketRouteClosePageParams = tObject({
+  code: tOptional(tNumber),
+  reason: tOptional(tString),
+  wasClean: tBoolean,
+});
+scheme.WebSocketRouteClosePageResult = tOptional(tObject({}));
+scheme.WebSocketRouteCloseServerParams = tObject({
+  code: tOptional(tNumber),
+  reason: tOptional(tString),
+  wasClean: tBoolean,
+});
+scheme.WebSocketRouteCloseServerResult = tOptional(tObject({}));
 scheme.ResourceTiming = tObject({
   startTime: tNumber,
   domainLookupStart: tNumber,
@@ -2227,6 +2297,17 @@ scheme.TracingTracingStartChunkParams = tObject({
 scheme.TracingTracingStartChunkResult = tObject({
   traceName: tString,
 });
+scheme.TracingTracingGroupParams = tObject({
+  name: tString,
+  location: tOptional(tObject({
+    file: tString,
+    line: tOptional(tNumber),
+    column: tOptional(tNumber),
+  })),
+});
+scheme.TracingTracingGroupResult = tOptional(tObject({}));
+scheme.TracingTracingGroupEndParams = tOptional(tObject({}));
+scheme.TracingTracingGroupEndResult = tOptional(tObject({}));
 scheme.TracingTracingStopChunkParams = tObject({
   mode: tEnum(['archive', 'discard', 'entries']),
 });

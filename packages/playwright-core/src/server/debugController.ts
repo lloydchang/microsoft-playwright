@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import type { Mode, Source } from '@recorder/recorderTypes';
+import type { ElementInfo, Mode, Source } from '@recorder/recorderTypes';
 import { gracefullyProcessExitDoNotHang } from '../utils/processLauncher';
 import type { Browser } from './browser';
 import type { BrowserContext } from './browserContext';
@@ -197,7 +197,7 @@ export class DebugController extends SdkObject {
     const contexts = new Set<BrowserContext>();
     for (const page of this._playwright.allPages())
       contexts.add(page.context());
-    const result = await Promise.all([...contexts].map(c => Recorder.show(c, () => Promise.resolve(new InspectingRecorderApp(this)), { omitCallTracking: true })));
+    const result = await Promise.all([...contexts].map(c => Recorder.showInspector(c, { omitCallTracking: true }, () => Promise.resolve(new InspectingRecorderApp(this)))));
     return result.filter(Boolean) as Recorder[];
   }
 
@@ -221,9 +221,9 @@ class InspectingRecorderApp extends EmptyRecorderApp {
     this._debugController = debugController;
   }
 
-  override async setSelector(selector: string): Promise<void> {
-    const locator: string = asLocator(this._debugController._sdkLanguage, selector);
-    this._debugController.emit(DebugController.Events.InspectRequested, { selector, locator });
+  override async elementPicked(elementInfo: ElementInfo): Promise<void> {
+    const locator: string = asLocator(this._debugController._sdkLanguage, elementInfo.selector);
+    this._debugController.emit(DebugController.Events.InspectRequested, { selector: elementInfo.selector, locator });
   }
 
   override async setSources(sources: Source[]): Promise<void> {

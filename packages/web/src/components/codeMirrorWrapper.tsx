@@ -26,7 +26,9 @@ export type SourceHighlight = {
   message?: string;
 };
 
-export type Language = 'javascript' | 'python' | 'java' | 'csharp' | 'jsonl' | 'html' | 'css' | 'markdown';
+export type Language = 'javascript' | 'python' | 'java' | 'csharp' | 'jsonl' | 'html' | 'css' | 'markdown' | 'yaml';
+
+export const lineHeight = 20;
 
 export interface SourceProps {
   text: string;
@@ -42,6 +44,7 @@ export interface SourceProps {
   focusOnChange?: boolean;
   wrapLines?: boolean;
   onChange?: (text: string) => void;
+  dataTestId?: string;
 }
 
 export const CodeMirrorWrapper: React.FC<SourceProps> = ({
@@ -57,6 +60,7 @@ export const CodeMirrorWrapper: React.FC<SourceProps> = ({
   focusOnChange,
   wrapLines,
   onChange,
+  dataTestId,
 }) => {
   const [measure, codemirrorElement] = useMeasure<HTMLDivElement>();
   const [modulePromise] = React.useState<Promise<CodeMirror>>(import('./codeMirrorModule').then(m => m.default));
@@ -168,7 +172,7 @@ export const CodeMirrorWrapper: React.FC<SourceProps> = ({
     };
   }, [codemirror, text, highlight, revealLine, focusOnChange, onChange]);
 
-  return <div className='cm-wrapper' ref={codemirrorElement} onClick={onCodeMirrorClick}></div>;
+  return <div data-testid={dataTestId} className='cm-wrapper' ref={codemirrorElement} onClick={onCodeMirrorClick}></div>;
 };
 
 function onCodeMirrorClick(event: React.MouseEvent) {
@@ -232,5 +236,6 @@ function languageToMode(language: Language | undefined): string | undefined {
     markdown: 'markdown',
     html: 'htmlmixed',
     css: 'css',
+    yaml: 'yaml',
   }[language];
 }

@@ -20,7 +20,7 @@ import '@web/common.css';
 import '@web/third_party/vscode/codicon.css';
 import type * as reporterTypes from 'playwright/types/testReporter';
 import React from 'react';
-import type { ContextEntry } from '../entries';
+import type { ContextEntry } from '../types/entries';
 import type { SourceLocation } from './modelUtil';
 import { MultiTraceModel } from './modelUtil';
 import { Workbench } from './workbench';
@@ -111,6 +111,7 @@ const outputDirForTestCase = (testCase: reporterTypes.TestCase): string | undefi
 async function loadSingleTraceFile(url: string): Promise<MultiTraceModel> {
   const params = new URLSearchParams();
   params.set('trace', url);
+  params.set('limit', '1');
   const response = await fetch(`contexts?${params.toString()}`);
   const contextEntries = await response.json() as ContextEntry[];
   return new MultiTraceModel(contextEntries);

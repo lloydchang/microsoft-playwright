@@ -401,6 +401,23 @@ pytest test_login.py --browser-channel msedge
 dotnet test -- Playwright.BrowserName=chromium Playwright.LaunchOptions.Channel=msedge
 ```
 
+######
+* langs: python
+
+Alternatively when using the library directly, you can specify the browser [`option: BrowserType.launch.channel`] when launching the browser:
+
+```python
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    # Channel can be "chrome", "msedge", "chrome-beta", "msedge-beta" or "msedge-dev".
+    browser = p.chromium.launch(channel="msedge")
+    page = browser.new_page()
+    page.goto("http://playwright.dev")
+    print(page.title())
+    browser.close()
+```
+
 #### Installing Google Chrome & Microsoft Edge
 
 If Google Chrome or Microsoft Edge is not available on your machine, you can install
@@ -454,6 +471,12 @@ rarely the case), you will also want to use the official channel.
 ##### Enterprise policy
 
 Google Chrome and Microsoft Edge respect enterprise policies, which include limitations to the capabilities, network proxy, mandatory extensions that stand in the way of testing. So if you are part of the organization that uses such policies, it is easiest to use bundled Chromium for your local testing, you can still opt into stable channels on the bots that are typically free of such restrictions.
+
+### Chromium Headless Shell
+
+Playwright runs a regular Chromium build in headed and headless modes. Note that headless mode has changed in Playwright version 1.49 when Chromium entirely switched to the [new headless implementation](https://developer.chrome.com/docs/chromium/headless).
+
+Playwright also provides [`'chromium-headless-shell'` channel](https://developer.chrome.com/blog/chrome-headless-shell) that differs from the regular Chromium browser in features, performance and behavior. If you would like to optimize your CI performance and can tolerate different behavior in some cases, install and use this channel similarly to [Google Chrome & Microsoft Edge](#google-chrome--microsoft-edge).
 
 ### Firefox
 

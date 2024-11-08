@@ -61,9 +61,9 @@ documentation.setLinkRenderer(item => {
   else if (item.member)
     return `<see cref="I${toTitleCase(item.member.clazz.name)}.${toMemberName(item.member)}${asyncSuffix}"/>`;
   else if (item.option)
-    return `<paramref name="${item.option}"/>`;
+    return `<paramref name="${item.option.name}"/>`;
   else if (item.param)
-    return `<paramref name="${item.param}"/>`;
+    return `<paramref name="${item.param.name}"/>`;
   else
     throw new Error('Unknown link format.');
 });
@@ -520,7 +520,8 @@ function renderMethod(member, parent, name, options, out) {
     && !name.startsWith('Get')
     && name !== 'CreateFormData'
     && !name.startsWith('PostDataJSON')
-    && !name.startsWith('As')) {
+    && !name.startsWith('As')
+    && name !== 'ConnectToServer') {
     if (!member.async) {
       if (member.spec && !options.nodocs)
         out.push(...XmlDoc.renderXmlDoc(member.spec, maxDocumentationColumnWidth));
@@ -718,7 +719,7 @@ function translateType(type, parent, generateNameCallback = t => t.name, optiona
   if (type.expression === '[null]|[Error]')
     return 'void';
 
-  if (type.name == 'Promise' && type.templates?.[0].name === 'any')
+  if (type.name === 'Promise' && type.templates?.[0].name === 'any')
     return 'Task';
 
   if (type.union) {

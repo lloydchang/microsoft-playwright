@@ -17,6 +17,7 @@
 import './toolbarButton.css';
 import '../third_party/vscode/codicon.css';
 import * as React from 'react';
+import { clsx } from '@web/uiUtils';
 
 export interface ToolbarButtonProps {
   title: string,
@@ -27,6 +28,7 @@ export interface ToolbarButtonProps {
   style?: React.CSSProperties,
   testId?: string,
   className?: string,
+  ariaLabel?: string,
 }
 
 export const ToolbarButton: React.FC<React.PropsWithChildren<ToolbarButtonProps>> = ({
@@ -39,12 +41,10 @@ export const ToolbarButton: React.FC<React.PropsWithChildren<ToolbarButtonProps>
   style,
   testId,
   className,
+  ariaLabel,
 }) => {
-  className = (className || '') + ` toolbar-button ${icon}`;
-  if (toggled)
-    className += ' toggled';
   return <button
-    className={className}
+    className={clsx(className, 'toolbar-button', icon, toggled && 'toggled')}
     onMouseDown={preventDefault}
     onClick={onClick}
     onDoubleClick={preventDefault}
@@ -52,6 +52,7 @@ export const ToolbarButton: React.FC<React.PropsWithChildren<ToolbarButtonProps>
     disabled={!!disabled}
     style={style}
     data-testid={testId}
+    aria-label={ariaLabel || title}
   >
     {icon && <span className={`codicon codicon-${icon}`} style={children ? { marginRight: 5 } : {}}></span>}
     {children}

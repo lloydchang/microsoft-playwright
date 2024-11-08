@@ -17,37 +17,41 @@
 import { test, expect, stripAnsi } from './playwright-test-fixtures';
 
 const stepIndentReporter = `
+import { FullConfig, Location, Reporter, Suite, TestStep } from '@playwright/test/reporter';
 import * as path from 'path';
 
-function formatPrefix(str) {
+function formatPrefix(str: string) {
   return str.padEnd(10, ' ') + '|';
 }
 
-function formatLocation(location) {
+function formatLocation(location?: Location) {
+  if (!location)
+    throw new Error('Location is missing');
   return ' @ ' + path.basename(location.file) + ':' + location.line;
 }
 
-function formatStack(indent, stack) {
-  stack = stack.split('\\n').filter(s => s.startsWith('    at '));
+function formatStack(indent: string, rawStack: string) {
+  let stack = rawStack.split('\\n').filter(s => s.startsWith('    at '));
   stack = stack.map(s => {
     const match =  /^(    at.* )\\(?([^ )]+)\\)?/.exec(s);
-    let location = match[2];
+    let location = match![2];
     location = location.substring(location.lastIndexOf(path.sep) + 1);
     return '    at ' + location;
   });
   return indent + stack.join('\\n' + indent);
 }
 
-class Reporter {
+export default class MyReporter implements Reporter {
   printErrorLocation: boolean;
   skipErrorMessage: boolean;
+  suite!: Suite;
 
-  constructor(options) {
+  constructor(options: { printErrorLocation: boolean, skipErrorMessage: boolean }) {
     this.printErrorLocation = options.printErrorLocation;
     this.skipErrorMessage = options.skipErrorMessage;
   }
 
-  trimError(message) {
+  trimError(message: string) {
     if (this.skipErrorMessage)
       return '<error message>';
     const lines = message.split('\\n');
@@ -59,24 +63,24 @@ class Reporter {
   }
 
   // For easier debugging.
-  onStdOut(data) {
+  onStdOut(data: string|Buffer) {
     process.stdout.write(data.toString());
   }
   // For easier debugging.
-  onStdErr(data) {
+  onStdErr(data: string|Buffer) {
     process.stderr.write(data.toString());
   }
 
-  printStep(step, indent) {
+  printStep(step: TestStep, indent: string) {
     let location = '';
     if (step.location)
       location = formatLocation(step.location);
     console.log(formatPrefix(step.category) + indent + step.title + location);
     if (step.error) {
       const errorLocation = this.printErrorLocation ? formatLocation(step.error.location) : '';
-      console.log(formatPrefix(step.category) + indent + '↪ error: ' + this.trimError(step.error.message) + errorLocation);
+      console.log(formatPrefix(step.category) + indent + '↪ error: ' + this.trimError(step.error.message!) + errorLocation);
       if (this.printErrorLocation)
-        console.log(formatStack(formatPrefix(step.category) + indent, step.error.stack));
+        console.log(formatStack(formatPrefix(step.category) + indent, step.error.stack!));
     }
     indent += '  ';
     for (const child of step.steps)
@@ -94,9 +98,9 @@ class Reporter {
             this.printStep(step, '');
           for (const error of result.errors) {
             const errorLocation = this.printErrorLocation ? formatLocation(error.location) : '';
-            console.log(formatPrefix('') + this.trimError(error.message) + errorLocation);
+            console.log(formatPrefix('') + this.trimError(error.message!) + errorLocation);
             if (this.printErrorLocation)
-              console.log(formatStack(formatPrefix(''), error.stack));
+              console.log(formatStack(formatPrefix(''), error.stack!));
           }
         }
       }
@@ -104,7 +108,6 @@ class Reporter {
     processSuite(this.suite);
   }
 }
-module.exports = Reporter;
 `;
 
 test('should report api step hierarchy', async ({ runInlineTest }) => {
@@ -540,37 +543,6 @@ hook      |Worker Cleanup
 fixture   |  fixture: browser
           |Test timeout of 2000ms exceeded.
           |Error: page.click: Target page, context or browser has been closed
-`);
-});
-
-test('should not nest page.continue inside page.goto steps', async ({ runInlineTest }) => {
-  const result = await runInlineTest({
-    'reporter.ts': stepIndentReporter,
-    'playwright.config.ts': `module.exports = { reporter: './reporter', };`,
-    'a.test.ts': `
-      import { test, expect } from '@playwright/test';
-      test('pass', async ({ page }) => {
-        await page.route('**/*', route => route.fulfill('<html></html>'));
-        await page.goto('http://localhost:1234');
-      });
-    `
-  }, { reporter: '' });
-
-  expect(result.exitCode).toBe(0);
-  expect(result.output).toBe(`
-hook      |Before Hooks
-fixture   |  fixture: browser
-pw:api    |    browserType.launch
-fixture   |  fixture: context
-pw:api    |    browser.newContext
-fixture   |  fixture: page
-pw:api    |    browserContext.newPage
-pw:api    |page.route @ a.test.ts:4
-pw:api    |page.goto(http://localhost:1234) @ a.test.ts:5
-pw:api    |route.fulfill @ a.test.ts:4
-hook      |After Hooks
-fixture   |  fixture: page
-fixture   |  fixture: context
 `);
 });
 
@@ -1100,7 +1072,10 @@ fixture   |  fixture: context
 `);
 });
 
-test('should report api steps', async ({ runInlineTest }) => {
+test('should report api steps', async ({ runInlineTest, server }) => {
+  server.setRoute('/empty.html', (req, res) => {
+    req.socket.end();
+  });
   const result = await runInlineTest({
     'reporter.ts': stepIndentReporter,
     'playwright.config.ts': `module.exports = { reporter: [['./reporter', { skipErrorMessage: true }]] };`,
@@ -1113,8 +1088,8 @@ test('should report api steps', async ({ runInlineTest }) => {
         ]);
         await page.click('button');
         await page.getByRole('button').click();
-        await page.request.get('http://localhost2').catch(() => {});
-        await request.get('http://localhost2').catch(() => {});
+        await page.request.get('${server.EMPTY_PAGE}').catch(() => {});
+        await request.get('${server.EMPTY_PAGE}').catch(() => {});
       });
 
       test.describe('suite', () => {
@@ -1164,9 +1139,9 @@ pw:api    |page.waitForNavigation @ a.test.ts:5
 pw:api    |page.goto(data:text/html,<button></button>) @ a.test.ts:6
 pw:api    |page.click(button) @ a.test.ts:8
 pw:api    |locator.getByRole('button').click @ a.test.ts:9
-pw:api    |apiRequestContext.get(http://localhost2) @ a.test.ts:10
+pw:api    |apiRequestContext.get(${server.EMPTY_PAGE}) @ a.test.ts:10
 pw:api    |↪ error: <error message>
-pw:api    |apiRequestContext.get(http://localhost2) @ a.test.ts:11
+pw:api    |apiRequestContext.get(${server.EMPTY_PAGE}) @ a.test.ts:11
 pw:api    |↪ error: <error message>
 hook      |After Hooks
 fixture   |  fixture: request
@@ -1247,14 +1222,14 @@ fixture   |  fixture: context
 `);
 });
 
-test('test location to test.step', async ({ runInlineTest }) => {
+test('should allow passing location to test.step', async ({ runInlineTest, runTSC }) => {
   const result = await runInlineTest({
     'reporter.ts': stepIndentReporter,
     'helper.ts': `
-      import { test } from '@playwright/test';
+      import { Location, TestType } from '@playwright/test';
 
-      export async function dummyStep(test, title, action, location) {
-        return await test.step(title, action, { location });
+      export async function dummyStep(test: TestType<{}, {}>, title: string, action: () => void, location: Location) {
+        await test.step(title, action, { location });
       }
 
       export function getCustomLocation() {
@@ -1272,8 +1247,7 @@ test('test location to test.step', async ({ runInlineTest }) => {
 
       test('custom location test', async () => {
         const location = getCustomLocation();
-        await dummyStep(test, 'Perform a dummy step', async () => {
-        }, location);
+        await dummyStep(test, 'Perform a dummy step', async () => {}, location);
       });
     `
   }, { reporter: '', workers: 1 });
@@ -1284,4 +1258,153 @@ hook      |Before Hooks
 test.step |Perform a dummy step @ dummy-file.ts:123
 hook      |After Hooks
 `);
+
+  const { exitCode } = await runTSC({
+    'a.test.ts': `
+      import { test, expect } from '@playwright/test';
+      test('should work', async () => {
+        const location = { file: 'dummy-file.ts', line: 123, column: 45 };
+        await test.step('step1', () => {}, { location });
+      });
+    `
+  });
+  expect(exitCode).toBe(0);
 });
+
+test('should show tracing.group nested inside test.step', async ({ runInlineTest }) => {
+  const result = await runInlineTest({
+    'reporter.ts': stepIndentReporter,
+    'playwright.config.ts': `module.exports = { reporter: [['./reporter', { printErrorLocation: true }]] };`,
+    'a.test.ts': `
+      import { test, expect } from '@playwright/test';
+      test('pass', async ({ page }) => {
+        await test.step('my step 1', async () => {
+          await test.step('my step 2', async () => {
+            await page.context().tracing.group('my group 1');
+            await page.context().tracing.group('my group 2');
+            await page.setContent('<button></button>');
+            await page.context().tracing.groupEnd();
+            await page.context().tracing.groupEnd();
+          });
+        });
+      });
+    `
+  }, { reporter: '', workers: 1 });
+
+  expect(result.exitCode).toBe(0);
+  expect(stripAnsi(result.output)).toBe(`
+hook      |Before Hooks
+fixture   |  fixture: browser
+pw:api    |    browserType.launch
+fixture   |  fixture: context
+pw:api    |    browser.newContext
+fixture   |  fixture: page
+pw:api    |    browserContext.newPage
+test.step |my step 1 @ a.test.ts:4
+test.step |  my step 2 @ a.test.ts:5
+pw:api    |    my group 1 @ a.test.ts:6
+pw:api    |      my group 2 @ a.test.ts:7
+pw:api    |        page.setContent @ a.test.ts:8
+hook      |After Hooks
+fixture   |  fixture: page
+fixture   |  fixture: context
+`);
+});
+
+test('calls from waitForEvent callback should be under its parent step', {
+  annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright/issues/33186' }
+}, async ({ runInlineTest, server }) => {
+  const result = await runInlineTest({
+    'reporter.ts': stepIndentReporter,
+    'playwright.config.ts': `module.exports = { reporter: './reporter' };`,
+    'a.test.ts': `
+      import { test, expect } from '@playwright/test';
+      test('waitForResponse step nesting', async ({ page }) => {
+        await page.goto('${server.EMPTY_PAGE}');
+        await page.setContent('<div onclick="fetch(\\'/simple.json\\').then(r => r.text());">Go!</div>');
+        const responseJson = await test.step('custom step', async () => {
+          const responsePromise = page.waitForResponse(async response => {
+            const text = await response.text();
+            expect(text).toBeTruthy();
+            return true;
+          });
+
+          await page.click('div');
+          const response = await responsePromise;
+          return await response.text();
+        });
+        expect(responseJson).toBe('{"foo": "bar"}\\n');
+      });
+      `
+  }, { reporter: '', workers: 1, timeout: 3000 });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.passed).toBe(0);
+  expect(result.output).not.toContain('Internal error');
+  expect(stripAnsi(result.output)).toBe(`
+hook      |Before Hooks
+fixture   |  fixture: browser
+pw:api    |    browserType.launch
+fixture   |  fixture: context
+pw:api    |    browser.newContext
+fixture   |  fixture: page
+pw:api    |    browserContext.newPage
+pw:api    |page.goto(${server.EMPTY_PAGE}) @ a.test.ts:4
+pw:api    |page.setContent @ a.test.ts:5
+test.step |custom step @ a.test.ts:6
+pw:api    |  page.waitForResponse @ a.test.ts:7
+pw:api    |  page.click(div) @ a.test.ts:13
+pw:api    |  response.text @ a.test.ts:8
+expect    |  expect.toBeTruthy @ a.test.ts:9
+pw:api    |  response.text @ a.test.ts:15
+expect    |expect.toBe @ a.test.ts:17
+hook      |After Hooks
+fixture   |  fixture: page
+fixture   |  fixture: context
+`);
+});
+
+test('calls from page.route callback should be under its parent step', {
+  annotation: { type: 'issue', description: 'https://github.com/microsoft/playwright/issues/33186' }
+}, async ({ runInlineTest, server }) => {
+  const result = await runInlineTest({
+    'reporter.ts': stepIndentReporter,
+    'playwright.config.ts': `module.exports = { reporter: './reporter' };`,
+    'a.test.ts': `
+      import { test, expect } from '@playwright/test';
+      test('waitForResponse step nesting', async ({ page }) => {
+        await test.step('custom step', async () => {
+          await page.route('**/empty.html', async route => {
+            const response = await route.fetch();
+            const text = await response.text();
+            expect(text).toBe('');
+            await route.fulfill({ response })
+          });
+          await page.goto('${server.EMPTY_PAGE}');
+        });
+      });
+      `
+  }, { reporter: '', workers: 1, timeout: 3000 });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.passed).toBe(0);
+  expect(result.output).not.toContain('Internal error');
+  expect(stripAnsi(result.output)).toBe(`
+hook      |Before Hooks
+fixture   |  fixture: browser
+pw:api    |    browserType.launch
+fixture   |  fixture: context
+pw:api    |    browser.newContext
+fixture   |  fixture: page
+pw:api    |    browserContext.newPage
+test.step |custom step @ a.test.ts:4
+pw:api    |  page.route @ a.test.ts:5
+pw:api    |  page.goto(${server.EMPTY_PAGE}) @ a.test.ts:11
+pw:api    |  apiResponse.text @ a.test.ts:7
+expect    |  expect.toBe @ a.test.ts:8
+hook      |After Hooks
+fixture   |  fixture: page
+fixture   |  fixture: context
+`);
+});
+

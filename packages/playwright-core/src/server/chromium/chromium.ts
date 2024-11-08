@@ -307,10 +307,7 @@ export class Chromium extends BrowserType {
     if (options.devtools)
       chromeArguments.push('--auto-open-devtools-for-tabs');
     if (options.headless) {
-      if (process.env.PLAYWRIGHT_CHROMIUM_USE_HEADLESS_NEW)
-        chromeArguments.push('--headless=new');
-      else
-        chromeArguments.push('--headless=old');
+      chromeArguments.push('--headless');
 
       chromeArguments.push(
           '--hide-scrollbars',
@@ -349,6 +346,12 @@ export class Chromium extends BrowserType {
     if (options.useWebSocket || options.args?.some(a => a.startsWith('--remote-debugging-port')))
       return new ChromiumReadyState();
     return undefined;
+  }
+
+  override getExecutableName(options: types.LaunchOptions): string {
+    if (options.channel === 'chromium-headless-shell' && !options.headless)
+      return 'chromium';
+    return options.channel || 'chromium';
   }
 }
 
