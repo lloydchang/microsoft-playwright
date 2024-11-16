@@ -640,17 +640,6 @@ test('call log should contain actual snapshot', async ({ page }) => {
   expect(stripAnsi(error.message)).toContain(`- unexpected value "- heading "todos" [level=1]"`);
 });
 
-test.fixme('should normalize whitespace when matching accessible name', async ({ page }) => {
-  await page.setContent(`
-    <button>hello world</button>
-  `);
-  await expect(page.locator('body')).toMatchAriaSnapshot(`
-    - |
-        button "hello
-          world"
-  `);
-});
-
 test('should parse attributes', async ({ page }) => {
   {
     await page.setContent(`
@@ -669,4 +658,18 @@ test('should parse attributes', async ({ page }) => {
       - heading [level =  -3 ]
     `);
   }
+});
+
+test('should not unshift actual template text', async ({ page }) => {
+  await page.setContent(`
+    <h1>title</h1>
+    <h1>title 2</h1>
+  `);
+  const error = await expect(page.locator('body')).toMatchAriaSnapshot(`
+        - heading "title" [level=1]
+    - heading "title 2" [level=1]
+  `, { timeout: 1000 }).catch(e => e);
+  expect(stripAnsi(error.message)).toContain(`
+    - heading "title" [level=1]
+- heading "title 2" [level=1]`);
 });

@@ -145,7 +145,7 @@ it.describe('permissions', () => {
   });
 });
 
-it('should support clipboard read', async ({ page, context, server, browserName, isWindows, isLinux, headless, channel }) => {
+it('should support clipboard read', async ({ page, context, server, browserName, isWindows, isLinux, headless, isHeadlessShell }) => {
   it.info().annotations.push({ type: 'issue', description: 'https://github.com/microsoft/playwright/issues/27475' });
   it.fail(browserName === 'firefox', 'No such permissions (requires flag) in Firefox');
   it.fixme(browserName === 'webkit' && isWindows, 'WebPasteboardProxy::allPasteboardItemInfo not implemented for Windows.');
@@ -156,8 +156,8 @@ it('should support clipboard read', async ({ page, context, server, browserName,
   if (browserName !== 'webkit')
     expect(await getPermission(page, 'clipboard-read')).toBe('prompt');
 
-  if (browserName === 'chromium' && channel === 'chromium-headless-shell') {
-    // Chromium shows a dialog and does not resolve the promise.
+  if (isHeadlessShell) {
+    // Chromium (but not headless-shell) shows a dialog and does not resolve the promise.
     const error = await page.evaluate(() => navigator.clipboard.readText()).catch(e => e);
     expect(error.toString()).toContain('denied');
   }

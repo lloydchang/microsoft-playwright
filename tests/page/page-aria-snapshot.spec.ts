@@ -27,7 +27,6 @@ function unshift(snapshot: string): string {
     const match = line.match(/^(\s*)/);
     if (match && match[1].length < whitespacePrefixLength)
       whitespacePrefixLength = match[1].length;
-    break;
   }
   return lines.filter(t => t.trim()).map(line => line.substring(whitespacePrefixLength)).join('\n');
 }
@@ -479,16 +478,16 @@ it('should escape yaml text in text nodes', async ({ page }) => {
   `);
 });
 
-it.fixme('should handle long strings', async ({ page }) => {
+it('should handle long strings', async ({ page }) => {
+  const s = 'a'.repeat(10000);
   await page.setContent(`
     <a href='about:blank'>
-      <div role='region'>${'a'.repeat(100000)}</div>
+      <div role='region'>${s}</div>
     </a>
   `);
 
-  const trimmed = 'a'.repeat(1000);
   await checkAndMatchSnapshot(page.locator('body'), `
-    - link "${trimmed}":
-      - region: "${trimmed}"
+    - link:
+      - region: ${s}
   `);
 });

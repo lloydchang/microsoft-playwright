@@ -79,7 +79,7 @@ export async function toMatchAriaSnapshot(
   if (notFound) {
     return {
       pass: this.isNot,
-      message: () => messagePrefix + `Expected: ${this.utils.printExpected(expected)}\nReceived: ${EXPECTED_COLOR('not found')}` + callLogText(log),
+      message: () => messagePrefix + `Expected: ${this.utils.printExpected(expected)}\nReceived: ${EXPECTED_COLOR('<element not found>')}` + callLogText(log),
       name: 'toMatchAriaSnapshot',
       expected,
     };
@@ -126,7 +126,6 @@ function unshift(snapshot: string): string {
     const match = line.match(/^(\s*)/);
     if (match && match[1].length < whitespacePrefixLength)
       whitespacePrefixLength = match[1].length;
-    break;
   }
   return lines.filter(t => t.trim()).map(line => line.substring(whitespacePrefixLength)).join('\n');
 }

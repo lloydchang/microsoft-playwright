@@ -40,7 +40,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
   readonly handleSIGINT: boolean | undefined;
   private _context: BrowserContext;
   private _mode: Mode;
-  private _highlightedElement: { selector?: string, ariaSnapshot?: ParsedYaml } = {};
+  private _highlightedElement: { selector?: string, ariaTemplate?: ParsedYaml } = {};
   private _overlayState: OverlayState = { offsetX: 0 };
   private _recorderApp: IRecorderApp | null = null;
   private _currentCallsMetadata = new Map<CallMetadata, SdkObject>();
@@ -107,8 +107,8 @@ export class Recorder implements InstrumentationListener, IRecorder {
       if (data.event === 'highlightRequested') {
         if (data.params.selector)
           this.setHighlightedSelector(this._currentLanguage, data.params.selector);
-        if (data.params.ariaSnapshot)
-          this.setHighlightedAriaSnapshot(data.params.ariaSnapshot);
+        if (data.params.ariaTemplate)
+          this.setHighlightedAriaTemplate(data.params.ariaTemplate);
         return;
       }
       if (data.event === 'step') {
@@ -130,6 +130,10 @@ export class Recorder implements InstrumentationListener, IRecorder {
       }
       if (data.event === 'clear') {
         this._contextRecorder.clearScript();
+        return;
+      }
+      if (data.event === 'runTask') {
+        this._contextRecorder.runTask(data.params.task);
         return;
       }
     });
@@ -169,7 +173,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
         mode: this._mode,
         actionPoint,
         actionSelector,
-        ariaTemplate: this._highlightedElement.ariaSnapshot,
+        ariaTemplate: this._highlightedElement.ariaTemplate,
         language: this._currentLanguage,
         testIdAttributeName: this._contextRecorder.testIdAttributeName(),
         overlay: this._overlayState,
@@ -225,8 +229,8 @@ export class Recorder implements InstrumentationListener, IRecorder {
     this._highlightedElement = {};
     this._mode = mode;
     this._recorderApp?.setMode(this._mode);
-    this._contextRecorder.setEnabled(this._mode === 'recording' || this._mode === 'assertingText' || this._mode === 'assertingVisibility' || this._mode === 'assertingValue' || this._mode === 'assertingSnapshot');
-    this._debugger.setMuted(this._mode === 'recording' || this._mode === 'assertingText' || this._mode === 'assertingVisibility' || this._mode === 'assertingValue');
+    this._contextRecorder.setEnabled(this._isRecording());
+    this._debugger.setMuted(this._isRecording());
     if (this._mode !== 'none' && this._mode !== 'standby' && this._context.pages().length === 1)
       this._context.pages()[0].bringToFront().catch(() => {});
     this._refreshOverlay();
@@ -245,8 +249,8 @@ export class Recorder implements InstrumentationListener, IRecorder {
     this._refreshOverlay();
   }
 
-  setHighlightedAriaSnapshot(ariaSnapshot: ParsedYaml) {
-    this._highlightedElement = { ariaSnapshot };
+  setHighlightedAriaTemplate(ariaTemplate: ParsedYaml) {
+    this._highlightedElement = { ariaTemplate };
     this._refreshOverlay();
   }
 
@@ -292,7 +296,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
   }
 
   async onBeforeCall(sdkObject: SdkObject, metadata: CallMetadata) {
-    if (this._omitCallTracking || this._mode === 'recording' || this._mode === 'assertingText' || this._mode === 'assertingVisibility' || this._mode === 'assertingValue')
+    if (this._omitCallTracking || this._isRecording())
       return;
     this._currentCallsMetadata.set(metadata, sdkObject);
     this._updateUserSources();
@@ -304,7 +308,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
   }
 
   async onAfterCall(sdkObject: SdkObject, metadata: CallMetadata) {
-    if (this._omitCallTracking || this._mode === 'recording' || this._mode === 'assertingText' || this._mode === 'assertingVisibility' || this._mode === 'assertingValue')
+    if (this._omitCallTracking || this._isRecording())
       return;
     if (!metadata.error)
       this._currentCallsMetadata.delete(metadata);
@@ -354,7 +358,7 @@ export class Recorder implements InstrumentationListener, IRecorder {
   }
 
   updateCallLog(metadatas: CallMetadata[]) {
-    if (this._mode === 'recording' || this._mode === 'assertingText' || this._mode === 'assertingVisibility' || this._mode === 'assertingValue')
+    if (this._isRecording())
       return;
     const logs: CallLog[] = [];
     for (const metadata of metadatas) {
@@ -368,6 +372,10 @@ export class Recorder implements InstrumentationListener, IRecorder {
       logs.push(metadataToCallLog(metadata, status));
     }
     this._recorderApp?.updateCallLogs(logs);
+  }
+
+  private _isRecording() {
+    return ['recording', 'assertingText', 'assertingVisibility', 'assertingValue', 'assertingSnapshot'].includes(this._mode);
   }
 
   private _readSource(fileName: string): string {

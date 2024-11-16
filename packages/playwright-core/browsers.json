@@ -3,21 +3,21 @@
   "browsers": [
     {
       "name": "chromium",
-      "revision": "1148",
+      "revision": "1149",
       "installByDefault": true,
-      "browserVersion": "131.0.6778.33"
+      "browserVersion": "132.0.6834.6"
     },
     {
       "name": "chromium-headless-shell",
-      "revision": "1148",
-      "installByDefault": false,
-      "browserVersion": "131.0.6778.33"
+      "revision": "1149",
+      "installByDefault": true,
+      "browserVersion": "132.0.6834.6"
     },
     {
       "name": "chromium-tip-of-tree",
-      "revision": "1276",
+      "revision": "1278",
       "installByDefault": false,
-      "browserVersion": "132.0.6824.0"
+      "browserVersion": "133.0.6836.0"
     },
     {
       "name": "firefox",
@@ -45,7 +45,7 @@
         "ubuntu20.04-x64": "2092",
         "ubuntu20.04-arm64": "2092"
       },
-      "browserVersion": "18.0"
+      "browserVersion": "18.2"
     },
     {
       "name": "ffmpeg",

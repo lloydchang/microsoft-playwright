@@ -20,15 +20,36 @@ import { escapeRegExp, longestCommonSubstring } from '@isomorphic/stringUtils';
 import { yamlEscapeKeyIfNeeded, yamlEscapeValueIfNeeded } from './yaml';
 import type { AriaProps, AriaRole, AriaTemplateNode, AriaTemplateRoleNode, AriaTemplateTextNode } from '@isomorphic/ariaSnapshot';
 
-type AriaNode = AriaProps & {
+export type AriaNode = AriaProps & {
   role: AriaRole | 'fragment';
   name: string;
   children: (AriaNode | string)[];
   element: Element;
 };
 
-export function generateAriaTree(rootElement: Element): AriaNode {
+export type AriaSnapshot = {
+  root: AriaNode;
+  elements: Map<number, Element>;
+  ids: Map<Element, number>;
+};
+
+export function generateAriaTree(rootElement: Element): AriaSnapshot {
   const visited = new Set<Node>();
+
+  const snapshot: AriaSnapshot = {
+    root: { role: 'fragment', name: '', children: [], element: rootElement },
+    elements: new Map<number, Element>(),
+    ids: new Map<Element, number>(),
+  };
+
+  const addElement = (element: Element) => {
+    const id = snapshot.elements.size + 1;
+    snapshot.elements.set(id, element);
+    snapshot.ids.set(element, id);
+  };
+
+  addElement(rootElement);
+
   const visit = (ariaNode: AriaNode, node: Node) => {
     if (visited.has(node))
       return;
@@ -58,6 +79,7 @@ export function generateAriaTree(rootElement: Element): AriaNode {
       }
     }
 
+    addElement(element);
     const childAriaNode = toAriaNode(element);
     if (childAriaNode)
       ariaNode.children.push(childAriaNode);
@@ -100,15 +122,14 @@ export function generateAriaTree(rootElement: Element): AriaNode {
   }
 
   roleUtils.beginAriaCaches();
-  const ariaRoot: AriaNode = { role: 'fragment', name: '', children: [], element: rootElement };
   try {
-    visit(ariaRoot, rootElement);
+    visit(snapshot.root, rootElement);
   } finally {
     roleUtils.endAriaCaches();
   }
 
-  normalizeStringChildren(ariaRoot);
-  return ariaRoot;
+  normalizeStringChildren(snapshot.root);
+  return snapshot;
 }
 
 function toAriaNode(element: Element): AriaNode | null {
@@ -141,10 +162,6 @@ function toAriaNode(element: Element): AriaNode | null {
     result.children = [element.value];
 
   return result;
-}
-
-export function renderedAriaTree(rootElement: Element, options?: { mode?: 'raw' | 'regex' }): string {
-  return renderAriaTree(generateAriaTree(rootElement), options);
 }
 
 function normalizeStringChildren(rootA11yNode: AriaNode) {
@@ -203,8 +220,8 @@ export type MatcherReceived = {
 };
 
 export function matchesAriaTree(rootElement: Element, template: AriaTemplateNode): { matches: AriaNode[], received: MatcherReceived } {
-  const root = generateAriaTree(rootElement);
-  const matches = matchesNodeDeep(root, template);
+  const root = generateAriaTree(rootElement).root;
+  const matches = matchesNodeDeep(root, template, false);
   return {
     matches,
     received: {
@@ -215,8 +232,9 @@ export function matchesAriaTree(rootElement: Element, template: AriaTemplateNode
 }
 
 export function getAllByAria(rootElement: Element, template: AriaTemplateNode): Element[] {
-  const result = matchesAriaTree(rootElement, template);
-  return result.matches.map(n => n.element);
+  const root = generateAriaTree(rootElement).root;
+  const matches = matchesNodeDeep(root, template, true);
+  return matches.map(n => n.element);
 }
 
 function matchesNode(node: AriaNode | string, template: AriaTemplateNode, depth: number): boolean {
@@ -265,12 +283,12 @@ function containsList(children: (AriaNode | string)[], template: AriaTemplateNod
   return true;
 }
 
-function matchesNodeDeep(root: AriaNode, template: AriaTemplateNode): AriaNode[] {
+function matchesNodeDeep(root: AriaNode, template: AriaTemplateNode, collectAll: boolean): AriaNode[] {
   const results: AriaNode[] = [];
   const visit = (node: AriaNode | string): boolean => {
     if (matchesNode(node, template, 0)) {
       results.push(node as AriaNode);
-      return true;
+      return !collectAll;
     }
     if (typeof node === 'string')
       return false;
@@ -284,7 +302,7 @@ function matchesNodeDeep(root: AriaNode, template: AriaTemplateNode): AriaNode[]
   return results;
 }
 
-export function renderAriaTree(ariaNode: AriaNode, options?: { mode?: 'raw' | 'regex' }): string {
+export function renderAriaTree(ariaNode: AriaNode, options?: { mode?: 'raw' | 'regex', ids?: Map<Element, number> }): string {
   const lines: string[] = [];
   const includeText = options?.mode === 'regex' ? textContributesInfo : () => true;
   const renderString = options?.mode === 'regex' ? convertToBestGuessRegex : (str: string) => str;
@@ -299,7 +317,8 @@ export function renderAriaTree(ariaNode: AriaNode, options?: { mode?: 'raw' | 'r
     }
 
     let key = ariaNode.role;
-    if (ariaNode.name) {
+    // Yaml has a limit of 1024 characters per key, and we leave some space for role and attributes.
+    if (ariaNode.name && ariaNode.name.length <= 900) {
       const name = renderString(ariaNode.name);
       if (name) {
         const stringifiedName = name.startsWith('/') && name.endsWith('/') ? name : JSON.stringify(name);
@@ -322,6 +341,11 @@ export function renderAriaTree(ariaNode: AriaNode, options?: { mode?: 'raw' | 'r
       key += ` [pressed]`;
     if (ariaNode.selected === true)
       key += ` [selected]`;
+    if (options?.ids) {
+      const id = options?.ids.get(ariaNode.element);
+      if (id)
+        key += ` [id=${id}]`;
+    }
 
     const escapedKey = indent + '- ' + yamlEscapeKeyIfNeeded(key);
     if (!ariaNode.children.length) {

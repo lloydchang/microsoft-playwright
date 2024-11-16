@@ -287,8 +287,9 @@ const playwrightFixtures: Fixtures<TestFixtures, WorkerFixtures> = ({
         const step = userData.step;
         step?.complete({ error });
       },
-      onWillPause: () => {
-        currentTestInfo()?._setDebugMode();
+      onWillPause: ({ keepTestTimeout }) => {
+        if (!keepTestTimeout)
+          currentTestInfo()?._setDebugMode();
       },
       runAfterCreateBrowserContext: async (context: BrowserContext) => {
         await artifactsRecorder?.didCreateBrowserContext(context);
@@ -617,9 +618,10 @@ class ArtifactsRecorder {
     if (captureScreenshots)
       await this._screenshotOnTestFailure();
 
-    const leftoverContexts: BrowserContext[] = [];
+    let leftoverContexts: BrowserContext[] = [];
     for (const browserType of [this._playwright.chromium, this._playwright.firefox, this._playwright.webkit])
       leftoverContexts.push(...(browserType as any)._contexts);
+    leftoverContexts = leftoverContexts.filter(context => !this._reusedContexts.has(context));
     const leftoverApiRequests: APIRequestContext[] =  Array.from((this._playwright.request as any)._contexts as Set<APIRequestContext>);
 
     // Collect traces/screenshots for remaining contexts.
